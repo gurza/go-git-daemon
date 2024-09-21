@@ -12,7 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
-// InfoRefs retrieves advertised references for a git repository.
+// InfoRefs retrieves the advertised references for the given repository.
 func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.AdvRefs, error) {
 	srv := server.NewServer(server.NewFilesystemLoader(fs))
 	ep, err := transport.NewEndpoint(repo)
@@ -35,6 +35,7 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.Adv
 	return res, nil
 }
 
+// UploadPack processes the git upload-pack operation for the given repository.
 func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.UploadPackResponse, error) {
 	req := packp.NewUploadPackRequest()
 	if err := req.Decode(r); err != nil {
