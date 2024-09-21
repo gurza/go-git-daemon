@@ -12,25 +12,27 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
-func InfoRefs(ctx context.Context, fs billy.Filesystem, repoPath string, w io.Writer) error {
+// InfoRefs retrieves advertised references for a git repository.
+func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.AdvRefs, error) {
 	srv := server.NewServer(server.NewFilesystemLoader(fs))
-
-	ep, err := transport.NewEndpoint(repoPath)
+	ep, err := transport.NewEndpoint(repo)
 	if err != nil {
-		return errors.New("failed to create endpoint")
+		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
 	}
-
 	sess, err := srv.NewUploadPackSession(ep, nil)
 	if err != nil {
-		return errors.New("failed to create session")
+		if errors.Is(err, transport.ErrRepositoryNotFound) {
+			return nil, fmt.Errorf("repository not found: %s", repo)
+		}
+		return nil, fmt.Errorf("failed to create upload pack session: %w", err)
 	}
 	defer sess.Close()
 
 	refs, err := sess.AdvertisedReferencesContext(ctx)
 	if err != nil {
-		return errors.New("failed to advertise references")
+		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
 	}
-	return refs.Encode(w)
+	return refs, nil
 }
 
 func UploadPack(ctx context.Context, fs billy.Filesystem, repoPath string, r io.Reader, w io.Writer) error {
