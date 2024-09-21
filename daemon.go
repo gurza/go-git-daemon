@@ -35,33 +35,26 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.Adv
 	return refs, nil
 }
 
-func UploadPack(ctx context.Context, fs billy.Filesystem, repoPath string, r io.Reader, w io.Writer) error {
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-
-	ep, err := transport.NewEndpoint(repoPath)
-	if err != nil {
-		return fmt.Errorf("failed to create endpoint: %w", err)
+func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.UploadPackResponse, error) {
+	req := packp.NewUploadPackRequest()
+	if err := req.Decode(r); err != nil {
+		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
+	srv := server.NewServer(server.NewFilesystemLoader(fs))
+	ep, err := transport.NewEndpoint(repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create endpoint: %w", err)
+	}
 	sess, err := srv.NewUploadPackSession(ep, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 	defer sess.Close()
 
-	req := packp.NewUploadPackRequest()
-	if err := req.Decode(r); err != nil {
-		return fmt.Errorf("failed to decode request: %w", err)
-	}
-
-	resp, err := sess.UploadPack(ctx, req)
+	res, err := sess.UploadPack(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to process upload-pack request: %w", err)
+		return nil, fmt.Errorf("failed to process upload-pack: %w", err)
 	}
-
-	if err := resp.Encode(w); err != nil {
-		return fmt.Errorf("failed to encode response: %w", err)
-	}
-
-	return nil
+	return res, nil
 }
