@@ -28,11 +28,11 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.Adv
 	}
 	defer sess.Close()
 
-	refs, err := sess.AdvertisedReferencesContext(ctx)
+	res, err := sess.AdvertisedReferencesContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
 	}
-	return refs, nil
+	return res, nil
 }
 
 func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.UploadPackResponse, error) {
