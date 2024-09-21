@@ -59,3 +59,29 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 	}
 	return res, nil
 }
+
+// ReceivePack processes the git receive-pack operation for the given
+// repository.
+func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.ReportStatus, error) {
+	req := packp.NewReferenceUpdateRequest()
+	if err := req.Decode(r); err != nil {
+		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
+	}
+
+	srv := server.NewServer(server.NewFilesystemLoader(fs))
+	ep, err := transport.NewEndpoint(repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create endpoint: %w", err)
+	}
+	sess, err := srv.NewReceivePackSession(ep, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create receive-pack session: %w", err)
+	}
+	defer sess.Close()
+
+	res, err := sess.ReceivePack(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process receive-pack: %w", err)
+	}
+	return res, nil
+}
