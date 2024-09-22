@@ -66,6 +66,11 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 		[]byte(fmt.Sprintf("# service=%s", svc)),
 		pktline.Flush,
 	}
+	// FIXME: add no-thin capability to work-around some go-git limitations
+	err = res.Capabilities.Add("no-thin")
+	if err != nil {
+		return nil, fmt.Errorf("failed to add no-thin capability: %w", err)
+	}
 	return res, nil
 }
 
