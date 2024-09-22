@@ -19,6 +19,7 @@ const (
 	ServiceReceivePack ServiceType = "git-receive-pack"
 )
 
+// newSession creates a new transport.Session for the given service type.
 func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
 	var (
 		sess transport.Session
@@ -36,9 +37,9 @@ func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType
 
 	if err != nil {
 		if errors.Is(err, transport.ErrRepositoryNotFound) {
-			return nil, fmt.Errorf("repository not found: %s", ep.Path)
+			return nil, fmt.Errorf("repository not found: %q", ep.Path)
 		}
-		return nil, fmt.Errorf("failed to create %s session for %s: %w", svc, ep.Path, err)
+		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, ep.Path, err)
 	}
 	return sess, nil
 }
@@ -75,17 +76,17 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
-	sessg, err := newSession(srv, ep, ServiceUploadPack)
+	sess, err := newSession(srv, ep, ServiceUploadPack)
 	if err != nil {
 		return nil, err
 	}
-	defer sessg.Close()
+	defer sess.Close()
 
-	sess, ok := sessg.(transport.UploadPackSession)
+	upSess, ok := sess.(transport.UploadPackSession)
 	if !ok {
 		return nil, fmt.Errorf("session does not implement UploadPackSession")
 	}
-	res, err := sess.UploadPack(ctx, req)
+	res, err := upSess.UploadPack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process upload-pack: %w", err)
 	}
@@ -105,17 +106,17 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
-	sessg, err := newSession(srv, ep, ServiceReceivePack)
+	sess, err := newSession(srv, ep, ServiceReceivePack)
 	if err != nil {
 		return nil, err
 	}
-	defer sessg.Close()
+	defer sess.Close()
 
-	sess, ok := sessg.(transport.ReceivePackSession)
+	rpSess, ok := sess.(transport.ReceivePackSession)
 	if !ok {
 		return nil, fmt.Errorf("session does not implement UploadPackSession")
 	}
-	res, err := sess.ReceivePack(ctx, req)
+	res, err := rpSess.ReceivePack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process receive-pack: %w", err)
 	}
