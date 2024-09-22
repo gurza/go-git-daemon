@@ -75,12 +75,16 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
-	sess, err := srv.NewUploadPackSession(ep, nil)
+	sessg, err := newSession(srv, ep, ServiceUploadPack)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
+		return nil, err
 	}
-	defer sess.Close()
+	defer sessg.Close()
 
+	sess, ok := sessg.(transport.UploadPackSession)
+	if !ok {
+		return nil, fmt.Errorf("session does not implement UploadPackSession")
+	}
 	res, err := sess.UploadPack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process upload-pack: %w", err)
@@ -101,12 +105,16 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
-	sess, err := srv.NewReceivePackSession(ep, nil)
+	sessg, err := newSession(srv, ep, ServiceReceivePack)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create receive-pack session: %w", err)
+		return nil, err
 	}
-	defer sess.Close()
+	defer sessg.Close()
 
+	sess, ok := sessg.(transport.ReceivePackSession)
+	if !ok {
+		return nil, fmt.Errorf("session does not implement UploadPackSession")
+	}
 	res, err := sess.ReceivePack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process receive-pack: %w", err)
