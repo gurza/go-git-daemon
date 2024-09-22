@@ -19,6 +19,30 @@ const (
 	ServiceReceivePack ServiceType = "git-receive-pack"
 )
 
+func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
+	var (
+		sess transport.Session
+		err  error
+	)
+
+	switch svc {
+	case ServiceUploadPack:
+		sess, err = srv.NewUploadPackSession(ep, nil)
+	case ServiceReceivePack:
+		sess, err = srv.NewReceivePackSession(ep, nil)
+	default:
+		return nil, fmt.Errorf("unsupported service type: %s", svc)
+	}
+
+	if err != nil {
+		if errors.Is(err, transport.ErrRepositoryNotFound) {
+			return nil, fmt.Errorf("repository not found: %s", ep.Path)
+		}
+		return nil, fmt.Errorf("failed to create %s session for %s: %w", svc, ep.Path, err)
+	}
+	return sess, nil
+}
+
 // InfoRefs retrieves the advertised references for the given repository.
 func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
 	srv := server.NewServer(server.NewFilesystemLoader(fs))
@@ -26,25 +50,9 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
 	}
-
-	var sess transport.Session
-	switch svc {
-	case ServiceUploadPack:
-		sess, err = srv.NewUploadPackSession(ep, nil)
-		if err != nil {
-			if errors.Is(err, transport.ErrRepositoryNotFound) {
-				return nil, fmt.Errorf("repository not found: %s", repo)
-			}
-			return nil, fmt.Errorf("failed to create upload pack session: %w", err)
-		}
-	case ServiceReceivePack:
-		sess, err = srv.NewReceivePackSession(ep, nil)
-		if err != nil {
-			if errors.Is(err, transport.ErrRepositoryNotFound) {
-				return nil, fmt.Errorf("repository not found: %s", repo)
-			}
-			return nil, fmt.Errorf("failed to create upload pack session: %w", err)
-		}
+	sess, err := newSession(srv, ep, svc)
+	if err != nil {
+		return nil, err
 	}
 	defer sess.Close()
 
