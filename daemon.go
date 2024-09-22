@@ -12,19 +12,39 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
+type ServiceType string
+
+const (
+	ServiceUploadPack  ServiceType = "git-upload-pack"
+	ServiceReceivePack ServiceType = "git-receive-pack"
+)
+
 // InfoRefs retrieves the advertised references for the given repository.
-func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string) (*packp.AdvRefs, error) {
+func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
 	srv := server.NewServer(server.NewFilesystemLoader(fs))
 	ep, err := transport.NewEndpoint(repo)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
 	}
-	sess, err := srv.NewUploadPackSession(ep, nil)
-	if err != nil {
-		if errors.Is(err, transport.ErrRepositoryNotFound) {
-			return nil, fmt.Errorf("repository not found: %s", repo)
+
+	var sess transport.Session
+	switch svc {
+	case ServiceUploadPack:
+		sess, err = srv.NewUploadPackSession(ep, nil)
+		if err != nil {
+			if errors.Is(err, transport.ErrRepositoryNotFound) {
+				return nil, fmt.Errorf("repository not found: %s", repo)
+			}
+			return nil, fmt.Errorf("failed to create upload pack session: %w", err)
 		}
-		return nil, fmt.Errorf("failed to create upload pack session: %w", err)
+	case ServiceReceivePack:
+		sess, err = srv.NewReceivePackSession(ep, nil)
+		if err != nil {
+			if errors.Is(err, transport.ErrRepositoryNotFound) {
+				return nil, fmt.Errorf("repository not found: %s", repo)
+			}
+			return nil, fmt.Errorf("failed to create upload pack session: %w", err)
+		}
 	}
 	defer sess.Close()
 
