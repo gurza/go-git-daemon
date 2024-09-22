@@ -124,7 +124,7 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 
 	rpSess, ok := sess.(transport.ReceivePackSession)
 	if !ok {
-		return nil, fmt.Errorf("session does not implement UploadPackSession")
+		return nil, fmt.Errorf("session does not implement ReceivePackSession")
 	}
 	res, err := rpSess.ReceivePack(ctx, req)
 	if err != nil {
