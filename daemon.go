@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-git/v5/plumbing/format/pktline"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
@@ -60,6 +61,10 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 	res, err := sess.AdvertisedReferencesContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
+	}
+	res.Prefix = [][]byte{
+		[]byte(fmt.Sprintf("# service=%s", svc)),
+		pktline.Flush,
 	}
 	return res, nil
 }
