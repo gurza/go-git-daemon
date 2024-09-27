@@ -105,7 +105,7 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	sess, err := newSession(fs, repo, ServiceReceivePack)
+	sess, err := newSession(fs, repo, ServiceUploadPack)
 	if err != nil {
 		return nil, err
 	}
