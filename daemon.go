@@ -96,9 +96,9 @@ func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPac
 	}
 	defer sess.Close()
 
-	upSess, err := asUploadPackSession(sess)
-	if err != nil {
-		return nil, err
+	upSess, ok := sess.(transport.UploadPackSession)
+	if !ok {
+		return nil, errors.New("session does not implement UploadPackSession")
 	}
 
 	res, err := upSess.UploadPack(ctx, req)
@@ -123,9 +123,9 @@ func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportSt
 	}
 	defer sess.Close()
 
-	rpSess, err := asReceivePackSession(sess)
-	if err != nil {
-		return nil, err
+	rpSess, ok := sess.(transport.ReceivePackSession)
+	if !ok {
+		return nil, errors.New("session does not implement ReceivePackSession")
 	}
 
 	res, err := rpSess.ReceivePack(ctx, req)
