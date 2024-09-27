@@ -87,8 +87,8 @@ func newSession(fs billy.Filesystem, repo string, svc ServiceType) (transport.Se
 }
 
 // InfoRefs retrieves the advertised references for the given repository.
-func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
-	sess, err := newSession(fs, repo, svc)
+func (s *Service) InfoRefs(ctx context.Context, svc ServiceType) (*packp.AdvRefs, error) {
+	sess, err := s.newSession(svc)
 	if err != nil {
 		return nil, err
 	}
@@ -111,13 +111,13 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 }
 
 // UploadPack processes the git upload-pack operation for the given repository.
-func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.UploadPackResponse, error) {
+func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPackResponse, error) {
 	req := packp.NewUploadPackRequest()
 	if err := req.Decode(r); err != nil {
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	sess, err := newSession(fs, repo, ServiceUploadPack)
+	sess, err := s.newSession(ServiceUploadPack)
 	if err != nil {
 		return nil, err
 	}
@@ -138,13 +138,13 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 
 // ReceivePack processes the git receive-pack operation for the given
 // repository.
-func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.ReportStatus, error) {
+func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportStatus, error) {
 	req := packp.NewReferenceUpdateRequest()
 	if err := req.Decode(r); err != nil {
 		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
 	}
 
-	sess, err := newSession(fs, repo, ServiceReceivePack)
+	sess, err := s.newSession(ServiceReceivePack)
 	if err != nil {
 		return nil, err
 	}
