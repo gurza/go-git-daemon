@@ -20,6 +20,17 @@ const (
 	ServiceReceivePack ServiceType = "git-receive-pack"
 )
 
+// newTransport creates a transport and endpoint pair for git operations using
+// a filesystem-backed repository.
+func newTransport(fs billy.Filesystem, repo string) (transport.Transport, *transport.Endpoint, error) {
+	srv := server.NewServer(server.NewFilesystemLoader(fs))
+	ep, err := transport.NewEndpoint(repo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid repository endpoint: %w", err)
+	}
+	return srv, ep, nil
+}
+
 // newSession creates a new transport.Session for the given service type.
 func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
 	var (
@@ -47,11 +58,11 @@ func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType
 
 // InfoRefs retrieves the advertised references for the given repository.
 func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
+	srv, ep, err := newTransport(fs, repo)
 	if err != nil {
-		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
+		return nil, err
 	}
+
 	sess, err := newSession(srv, ep, svc)
 	if err != nil {
 		return nil, err
@@ -81,11 +92,11 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
+	srv, ep, err := newTransport(fs, repo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create endpoint: %w", err)
+		return nil, err
 	}
+
 	sess, err := newSession(srv, ep, ServiceUploadPack)
 	if err != nil {
 		return nil, err
@@ -113,11 +124,11 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
 	}
 
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
+	srv, ep, err := newTransport(fs, repo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create endpoint: %w", err)
+		return nil, err
 	}
+
 	sess, err := newSession(srv, ep, ServiceReceivePack)
 	if err != nil {
 		return nil, err
