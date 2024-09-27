@@ -31,8 +31,9 @@ func newTransport(fs billy.Filesystem, repo string) (transport.Transport, *trans
 	return srv, ep, nil
 }
 
-// newSession creates a new transport.Session for the given service type.
-func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
+// newSession creates a service session for git operations using existing
+// transport components.
+func newSessionWithTransport(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
 	var (
 		sess transport.Session
 		err  error
@@ -53,17 +54,29 @@ func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType
 		}
 		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, ep.Path, err)
 	}
+
 	return sess, nil
 }
 
-// InfoRefs retrieves the advertised references for the given repository.
-func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
+// newSession creates a service session for git operations using
+// a filesystem-backed repository.
+func newSession(fs billy.Filesystem, repo string, svc ServiceType) (transport.Session, error) {
 	srv, ep, err := newTransport(fs, repo)
 	if err != nil {
 		return nil, err
 	}
 
-	sess, err := newSession(srv, ep, svc)
+	sess, err := newSessionWithTransport(srv, ep, svc)
+	if err != nil {
+		return nil, err
+	}
+
+	return sess, nil
+}
+
+// InfoRefs retrieves the advertised references for the given repository.
+func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
+	sess, err := newSession(fs, repo, svc)
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +105,7 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	srv, ep, err := newTransport(fs, repo)
-	if err != nil {
-		return nil, err
-	}
-
-	sess, err := newSession(srv, ep, ServiceUploadPack)
+	sess, err := newSession(fs, repo, ServiceReceivePack)
 	if err != nil {
 		return nil, err
 	}
@@ -124,12 +132,7 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
 	}
 
-	srv, ep, err := newTransport(fs, repo)
-	if err != nil {
-		return nil, err
-	}
-
-	sess, err := newSession(srv, ep, ServiceReceivePack)
+	sess, err := newSession(fs, repo, ServiceReceivePack)
 	if err != nil {
 		return nil, err
 	}
