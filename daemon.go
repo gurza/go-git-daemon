@@ -20,6 +20,20 @@ const (
 	ServiceReceivePack ServiceType = "git-receive-pack"
 )
 
+type Service struct {
+	srv transport.Transport
+	ep  *transport.Endpoint
+}
+
+func New(fs billy.Filesystem, repo string) (*Service, error) {
+	srv := server.NewServer(server.NewFilesystemLoader(fs))
+	ep, err := transport.NewEndpoint(repo)
+	if err != nil {
+		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
+	}
+	return &Service{srv: srv, ep: ep}, nil
+}
+
 // newTransport creates a transport and endpoint pair for git operations using
 // a filesystem-backed repository.
 func newTransport(fs billy.Filesystem, repo string) (transport.Transport, *transport.Endpoint, error) {
