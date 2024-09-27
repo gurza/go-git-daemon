@@ -45,9 +45,7 @@ func newTransport(fs billy.Filesystem, repo string) (transport.Transport, *trans
 	return srv, ep, nil
 }
 
-// newSession creates a service session for git operations using existing
-// transport components.
-func newSessionWithTransport(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
+func (s *Service) newSession(svc ServiceType) (transport.Session, error) {
 	var (
 		sess transport.Session
 		err  error
@@ -55,18 +53,18 @@ func newSessionWithTransport(srv transport.Transport, ep *transport.Endpoint, sv
 
 	switch svc {
 	case ServiceUploadPack:
-		sess, err = srv.NewUploadPackSession(ep, nil)
+		sess, err = s.srv.NewUploadPackSession(s.ep, nil)
 	case ServiceReceivePack:
-		sess, err = srv.NewReceivePackSession(ep, nil)
+		sess, err = s.srv.NewReceivePackSession(s.ep, nil)
 	default:
 		return nil, fmt.Errorf("unsupported service type: %s", svc)
 	}
 
 	if err != nil {
 		if errors.Is(err, transport.ErrRepositoryNotFound) {
-			return nil, fmt.Errorf("repository not found: %q", ep.Path)
+			return nil, fmt.Errorf("repository not found: %q", s.ep.Path)
 		}
-		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, ep.Path, err)
+		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, s.ep.Path, err)
 	}
 
 	return sess, nil
