@@ -92,14 +92,16 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 	}
 	defer sess.Close()
 
-	upSess, ok := sess.(transport.UploadPackSession)
-	if !ok {
-		return nil, fmt.Errorf("session does not implement UploadPackSession")
+	upSess, err := asUploadPackSession(sess)
+	if err != nil {
+		return nil, err
 	}
+
 	res, err := upSess.UploadPack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process upload-pack: %w", err)
 	}
+
 	return res, nil
 }
 
@@ -122,13 +124,15 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 	}
 	defer sess.Close()
 
-	rpSess, ok := sess.(transport.ReceivePackSession)
-	if !ok {
-		return nil, fmt.Errorf("session does not implement ReceivePackSession")
+	rpSess, err := asReceivePackSession(sess)
+	if err != nil {
+		return nil, err
 	}
+
 	res, err := rpSess.ReceivePack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process receive-pack: %w", err)
 	}
+
 	return res, nil
 }
