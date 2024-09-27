@@ -34,17 +34,6 @@ func New(fs billy.Filesystem, repo string) (*Service, error) {
 	return &Service{srv: srv, ep: ep}, nil
 }
 
-// newTransport creates a transport and endpoint pair for git operations using
-// a filesystem-backed repository.
-func newTransport(fs billy.Filesystem, repo string) (transport.Transport, *transport.Endpoint, error) {
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid repository endpoint: %w", err)
-	}
-	return srv, ep, nil
-}
-
 func (s *Service) newSession(svc ServiceType) (transport.Session, error) {
 	var (
 		sess transport.Session
@@ -65,22 +54,6 @@ func (s *Service) newSession(svc ServiceType) (transport.Session, error) {
 			return nil, fmt.Errorf("repository not found: %q", s.ep.Path)
 		}
 		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, s.ep.Path, err)
-	}
-
-	return sess, nil
-}
-
-// newSession creates a service session for git operations using
-// a filesystem-backed repository.
-func newSession(fs billy.Filesystem, repo string, svc ServiceType) (transport.Session, error) {
-	srv, ep, err := newTransport(fs, repo)
-	if err != nil {
-		return nil, err
-	}
-
-	sess, err := newSessionWithTransport(srv, ep, svc)
-	if err != nil {
-		return nil, err
 	}
 
 	return sess, nil
