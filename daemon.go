@@ -110,9 +110,9 @@ func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPac
 	}
 	defer sess.Close()
 
-	upSess, ok := sess.(transport.UploadPackSession)
-	if !ok {
-		return nil, fmt.Errorf("invalid session type: %T, expected UploadPackSession", sess)
+	upSess, err := asUploadPackSession(sess)
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := upSess.UploadPack(ctx, req)
@@ -136,9 +136,9 @@ func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportSt
 	}
 	defer sess.Close()
 
-	rpSess, ok := sess.(transport.ReceivePackSession)
-	if !ok {
-		return nil, fmt.Errorf("invalid session type: %T, expected ReceivePackSession", sess)
+	rpSess, err := asReceivePackSession(sess)
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := rpSess.ReceivePack(ctx, req)
