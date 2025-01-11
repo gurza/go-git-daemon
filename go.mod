@@ -1,6 +1,6 @@
 module github.com/gurza/go-git-daemon
 
-go 1.21.9
+go 1.21
 
 require (
 	github.com/go-git/go-billy/v5 v5.6.0
