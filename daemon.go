@@ -59,7 +59,7 @@ func (s *Service) newSession(typ GitServiceType) (transport.Session, error) {
 	return sess, nil
 }
 
-// InfoRefs retrieves the advertised references for the given repository.
+// InfoRefs returns advertised references for the specified git service.
 func (s *Service) InfoRefs(ctx context.Context, typ GitServiceType) (*packp.AdvRefs, error) {
 	sess, err := s.newSession(typ)
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *Service) InfoRefs(ctx context.Context, typ GitServiceType) (*packp.AdvR
 	return res, nil
 }
 
-// UploadPack processes the git upload-pack operation for the given repository.
+// UploadPack processes fetch/clone protocol requests.
 func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPackResponse, error) {
 	req := packp.NewUploadPackRequest()
 	if err := req.Decode(r); err != nil {
@@ -109,8 +109,7 @@ func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPac
 	return res, nil
 }
 
-// ReceivePack processes the git receive-pack operation for the given
-// repository.
+// ReceivePack processes push protocol requests.
 func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportStatus, error) {
 	req := packp.NewReferenceUpdateRequest()
 	if err := req.Decode(r); err != nil {
