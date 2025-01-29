@@ -13,13 +13,15 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
-type GitServiceType string
+// GitServiceName identifies Git protocol services.
+type GitServiceName string
 
 const (
-	GitServiceUploadPack  GitServiceType = "git-upload-pack"
-	GitServiceReceivePack GitServiceType = "git-receive-pack"
+	GitUploadPack  GitServiceName = "git-upload-pack"  // Handles fetch/clone operations
+	GitReceivePack GitServiceName = "git-receive-pack" // Handles push operations
 )
 
+// Service handles Git daemon protocol operations for a repository.
 type Service struct {
 	srv transport.Transport
 	ep  *transport.Endpoint
@@ -34,34 +36,34 @@ func NewService(fs billy.Filesystem, repo string) (*Service, error) {
 	return &Service{srv: srv, ep: ep}, nil
 }
 
-func (s *Service) newSession(typ GitServiceType) (transport.Session, error) {
+func (s *Service) newSession(nm GitServiceName) (transport.Session, error) {
 	var (
 		sess transport.Session
 		err  error
 	)
 
-	switch typ {
-	case GitServiceUploadPack:
+	switch nm {
+	case GitUploadPack:
 		sess, err = s.srv.NewUploadPackSession(s.ep, nil)
-	case GitServiceReceivePack:
+	case GitReceivePack:
 		sess, err = s.srv.NewReceivePackSession(s.ep, nil)
 	default:
-		return nil, fmt.Errorf("unsupported service type: %s", typ)
+		return nil, fmt.Errorf("unsupported service: %s", nm)
 	}
 
 	if err != nil {
 		if errors.Is(err, transport.ErrRepositoryNotFound) {
 			return nil, fmt.Errorf("repository not found: %q", s.ep.Path)
 		}
-		return nil, fmt.Errorf("failed to create %s session for %q: %w", typ, s.ep.Path, err)
+		return nil, fmt.Errorf("failed to create %s session for %q: %w", nm, s.ep.Path, err)
 	}
 
 	return sess, nil
 }
 
-// InfoRefs returns advertised references for the specified git service.
-func (s *Service) InfoRefs(ctx context.Context, typ GitServiceType) (*packp.AdvRefs, error) {
-	sess, err := s.newSession(typ)
+// InfoRefs returns advertised references for the specified Git service.
+func (s *Service) InfoRefs(ctx context.Context, nm GitServiceName) (*packp.AdvRefs, error) {
+	sess, err := s.newSession(nm)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +74,7 @@ func (s *Service) InfoRefs(ctx context.Context, typ GitServiceType) (*packp.AdvR
 		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
 	}
 	res.Prefix = [][]byte{
-		[]byte(fmt.Sprintf("# service=%s", typ)),
+		[]byte(fmt.Sprintf("# service=%s", nm)),
 		pktline.Flush,
 	}
 	// FIXME: add no-thin capability to work-around some go-git limitations
@@ -90,7 +92,7 @@ func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPac
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	sess, err := s.newSession(GitServiceUploadPack)
+	sess, err := s.newSession(GitUploadPack)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +118,7 @@ func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportSt
 		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
 	}
 
-	sess, err := s.newSession(GitServiceReceivePack)
+	sess, err := s.newSession(GitReceivePack)
 	if err != nil {
 		return nil, err
 	}
