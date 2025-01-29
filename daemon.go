@@ -13,46 +13,58 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
-type ServiceType string
+// GitServiceName identifies Git protocol services.
+type GitServiceName string
 
 const (
-	ServiceUploadPack  ServiceType = "git-upload-pack"
-	ServiceReceivePack ServiceType = "git-receive-pack"
+	GitUploadPack  GitServiceName = "git-upload-pack"  // Handles fetch/clone operations
+	GitReceivePack GitServiceName = "git-receive-pack" // Handles push operations
 )
 
-// newSession creates a new transport.Session for the given service type.
-func newSession(srv transport.Transport, ep *transport.Endpoint, svc ServiceType) (transport.Session, error) {
-	var (
-		sess transport.Session
-		err  error
-	)
-
-	switch svc {
-	case ServiceUploadPack:
-		sess, err = srv.NewUploadPackSession(ep, nil)
-	case ServiceReceivePack:
-		sess, err = srv.NewReceivePackSession(ep, nil)
-	default:
-		return nil, fmt.Errorf("unsupported service type: %s", svc)
-	}
-
-	if err != nil {
-		if errors.Is(err, transport.ErrRepositoryNotFound) {
-			return nil, fmt.Errorf("repository not found: %q", ep.Path)
-		}
-		return nil, fmt.Errorf("failed to create %s session for %q: %w", svc, ep.Path, err)
-	}
-	return sess, nil
+// Service handles Git daemon protocol operations for a repository.
+type Service struct {
+	srv transport.Transport
+	ep  *transport.Endpoint
 }
 
-// InfoRefs retrieves the advertised references for the given repository.
-func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc ServiceType) (*packp.AdvRefs, error) {
+func NewService(fs billy.Filesystem, repo string) (*Service, error) {
 	srv := server.NewServer(server.NewFilesystemLoader(fs))
 	ep, err := transport.NewEndpoint(repo)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository endpoint: %w", err)
 	}
-	sess, err := newSession(srv, ep, svc)
+	return &Service{srv: srv, ep: ep}, nil
+}
+
+func (s *Service) newSession(nm GitServiceName) (transport.Session, error) {
+	var (
+		sess transport.Session
+		err  error
+	)
+
+	switch nm {
+	case GitUploadPack:
+		sess, err = s.srv.NewUploadPackSession(s.ep, nil)
+	case GitReceivePack:
+		sess, err = s.srv.NewReceivePackSession(s.ep, nil)
+	default:
+		return nil, fmt.Errorf("unsupported service: %s", nm)
+	}
+
+	if err != nil {
+		// FIXME: Add other specific error checks
+		if errors.Is(err, transport.ErrRepositoryNotFound) {
+			return nil, fmt.Errorf("repository not found: %q", s.ep.Path)
+		}
+		return nil, fmt.Errorf("failed to create %s session for %q: %w", nm, s.ep.Path, err)
+	}
+
+	return sess, nil
+}
+
+// InfoRefs returns advertised references for the specified Git service.
+func (s *Service) InfoRefs(ctx context.Context, nm GitServiceName) (*packp.AdvRefs, error) {
+	sess, err := s.newSession(nm)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +75,7 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
 	}
 	res.Prefix = [][]byte{
-		[]byte(fmt.Sprintf("# service=%s", svc)),
+		[]byte(fmt.Sprintf("# service=%s", nm)),
 		pktline.Flush,
 	}
 	// FIXME: add no-thin capability to work-around some go-git limitations
@@ -74,19 +86,14 @@ func InfoRefs(ctx context.Context, fs billy.Filesystem, repo string, svc Service
 	return res, nil
 }
 
-// UploadPack processes the git upload-pack operation for the given repository.
-func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.UploadPackResponse, error) {
+// UploadPack processes fetch/clone protocol requests.
+func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPackResponse, error) {
 	req := packp.NewUploadPackRequest()
 	if err := req.Decode(r); err != nil {
 		return nil, fmt.Errorf("failed to decode upload-pack request: %w", err)
 	}
 
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create endpoint: %w", err)
-	}
-	sess, err := newSession(srv, ep, ServiceUploadPack)
+	sess, err := s.newSession(GitUploadPack)
 	if err != nil {
 		return nil, err
 	}
@@ -94,29 +101,25 @@ func UploadPack(ctx context.Context, fs billy.Filesystem, repo string, r io.Read
 
 	upSess, ok := sess.(transport.UploadPackSession)
 	if !ok {
-		return nil, fmt.Errorf("session does not implement UploadPackSession")
+		return nil, fmt.Errorf("invalid session type: %T, expected UploadPackSession", sess)
 	}
+
 	res, err := upSess.UploadPack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process upload-pack: %w", err)
 	}
+
 	return res, nil
 }
 
-// ReceivePack processes the git receive-pack operation for the given
-// repository.
-func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Reader) (*packp.ReportStatus, error) {
+// ReceivePack processes push protocol requests.
+func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportStatus, error) {
 	req := packp.NewReferenceUpdateRequest()
 	if err := req.Decode(r); err != nil {
 		return nil, fmt.Errorf("failed to decode receive-pack request: %w", err)
 	}
 
-	srv := server.NewServer(server.NewFilesystemLoader(fs))
-	ep, err := transport.NewEndpoint(repo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create endpoint: %w", err)
-	}
-	sess, err := newSession(srv, ep, ServiceReceivePack)
+	sess, err := s.newSession(GitReceivePack)
 	if err != nil {
 		return nil, err
 	}
@@ -124,11 +127,13 @@ func ReceivePack(ctx context.Context, fs billy.Filesystem, repo string, r io.Rea
 
 	rpSess, ok := sess.(transport.ReceivePackSession)
 	if !ok {
-		return nil, fmt.Errorf("session does not implement ReceivePackSession")
+		return nil, fmt.Errorf("invalid session type: %T, expected ReceivePackSession", sess)
 	}
+
 	res, err := rpSess.ReceivePack(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process receive-pack: %w", err)
 	}
+
 	return res, nil
 }
