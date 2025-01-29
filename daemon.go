@@ -52,6 +52,7 @@ func (s *Service) newSession(nm GitServiceName) (transport.Session, error) {
 	}
 
 	if err != nil {
+		// FIXME: Add other specific error checks
 		if errors.Is(err, transport.ErrRepositoryNotFound) {
 			return nil, fmt.Errorf("repository not found: %q", s.ep.Path)
 		}
