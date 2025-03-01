@@ -2,4 +2,5 @@
 
 ## Status
 
-`go-git-daemon` library still in development and until version 1 released some breaking changes possible.
+The `go-git-daemon` library is still in development.
+Until version 1.0 is released, some breaking changes may occur.
