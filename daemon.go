@@ -74,16 +74,27 @@ func (s *Service) InfoRefs(ctx context.Context, nm GitServiceName) (*packp.AdvRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve advertised references: %w", err)
 	}
+
+	// Set prefix and capabilities
+	if err := s.configureAdvRefs(res, nm); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (s *Service) configureAdvRefs(res *packp.AdvRefs, nm GitServiceName) error {
 	res.Prefix = [][]byte{
 		[]byte(fmt.Sprintf("# service=%s", nm)),
 		pktline.Flush,
 	}
-	// FIXME: add no-thin capability to work-around some go-git limitations
-	err = res.Capabilities.Add("no-thin")
-	if err != nil {
-		return nil, fmt.Errorf("failed to add no-thin capability: %w", err)
+
+	// Add the no-thin capability to work around go-git limitations
+	if err := res.Capabilities.Add("no-thin"); err != nil {
+		return fmt.Errorf("failed to add no-thin capability: %w", err)
 	}
-	return res, nil
+
+	return nil
 }
 
 // UploadPack processes fetch/clone protocol requests.
@@ -99,9 +110,9 @@ func (s *Service) UploadPack(ctx context.Context, r io.Reader) (*packp.UploadPac
 	}
 	defer sess.Close()
 
-	upSess, ok := sess.(transport.UploadPackSession)
-	if !ok {
-		return nil, fmt.Errorf("invalid session type: %T, expected UploadPackSession", sess)
+	upSess, err := asUploadPackSession(sess)
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := upSess.UploadPack(ctx, req)
@@ -125,9 +136,9 @@ func (s *Service) ReceivePack(ctx context.Context, r io.Reader) (*packp.ReportSt
 	}
 	defer sess.Close()
 
-	rpSess, ok := sess.(transport.ReceivePackSession)
-	if !ok {
-		return nil, fmt.Errorf("invalid session type: %T, expected ReceivePackSession", sess)
+	rpSess, err := asReceivePackSession(sess)
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := rpSess.ReceivePack(ctx, req)
